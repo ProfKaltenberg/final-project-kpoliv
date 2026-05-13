@@ -40,17 +40,17 @@ df_forecast <- read_excel("chart-gallery.xlsx", sheet = "1") |>
   dplyr::select(c("...2", "...4")) |>  ## selecting the columnn i want to stay with
   dplyr::rename(date = "...2", forecast = "...4") |> ##renaming
   filter(!is.na(date) & !is.na(forecast)) |> ## deleting the NANs 
-  filter(date != "Month") |>  #deleting the word month that appears for some reason                                
+  filter(date != "Month") |>  #deleting the word month that appears for some reason          
   mutate(date = as.Date(as.numeric(date), origin = "1899-12-30")) ## fixing the date format 
 
-df_final <- data  
+df_final <- data  ## i created a new variable not to damage the original one
 
 df_final <- bind_rows( # binding the forcast with the df by rows
   df_final,
   df_forecast |> # inside that dataframe i look for the last observation to see where to start
-    filter(date > last(df_final$date)) |>
-    mutate(wti = as.numeric(forecast)) |> # create a column an numeber called wti
-    select(-forecast)) |> # i delete this because now i have my wti columns 
+    filter(date > last(df_final$date))|> 
+    mutate(wti = as.numeric(forecast))) |> # create a column an numeric called wti
+    dplyr::select(-forecast) |> # i delete this because now i have my wti columns
   arrange(date) |> 
   fill(cpi, core_cpi, diesel, .direction = "down") |> # fill with the last obs of each variables to the rest of the 2026
   mutate(
@@ -58,7 +58,6 @@ df_final <- bind_rows( # binding the forcast with the df by rows
     wti_gallon     = wti / 42, # covert per barrel to per gallon
     spread_wti_diesel = diesel - wti_gallon) |>
   filter(year < 2027)
-
 ```
 
 ```{r}
@@ -86,8 +85,10 @@ ggplot(yoy_data, aes(x = date, y = wti)) +
     ymin = -Inf, ymax = Inf, fill = "grey70", alpha = 0.4) + ## shaded gray area
   geom_hline(yintercept = mean(yoy_data$wti, na.rm = TRUE),
     linetype = "dashed", color = "darkred") +
-  labs(title = "WTI YoY (%)", x = NULL, y = "%") +
-  theme_bcrd
+  labs(title = "WTI YoY (%)", x = "years", y = "%") +
+  theme_bcrd +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), 
+        axis.title = element_text(family = "Gotham Book", size = 10))
 
 ```
 
@@ -173,7 +174,8 @@ plot_coef <- function(df, title) {
     scale_x_continuous(breaks = seq(min(df$year), max(df$year), by = 1)) +
     labs(title = title, x = "Year", y = "Coefficient") +
     theme_bcrd +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+    theme(axis.text.x = element_text(angle = 45, hjust = 1), 
+        axis.title = element_text(family = "Gotham Book", size = 10))
 }
 
 plot_coef(diesel_core,     "Diesel Impact on Core Inflation (Yearly)")
@@ -184,7 +186,9 @@ plot_coef(wti_headline,    "WTI Impact on Headline Inflation (Yearly)")
 
 ```
 
-## 4. Stargazer with Robust Standard Errors
+## 4. Stargazer with Robust Standard Error
+
+The strongest passthrough comes in the headline inflation that receives a 0.02pp WTI and 0.03pp diesel, while the impact in the core inflation is less. The diesel–WTI spread is also significant in most specifications, suggesting additional explanatory power for inflation dynamics beyond individual price levels.
 
 ```{r, results='asis'}
 ols_r1 <- coeftest(model1, vcov = vcovHC(model1, type = "HC0"))
